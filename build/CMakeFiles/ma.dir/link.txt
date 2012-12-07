@@ -1,1 +1,0 @@
-/usr/bin/gcc      CMakeFiles/ma.dir/ma.c.o  -o ma -rdynamic libcma.a 
