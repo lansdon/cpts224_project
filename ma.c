@@ -1,9 +1,12 @@
 #include "cma.h"
+#include "project_config.h"
 
 #define MSIZE 1024*16
 unsigned char mem[MSIZE];
 
 int main(int argc, char * argv[]) {
+	printf("Version %f.%f\n", cs224_project_VERSION_MAJOR, cs224_project_VERSION_MINOR);
+
 	int i;
 	char *strings[10];
 	class_memory(mem,MSIZE); // give it memory allocator

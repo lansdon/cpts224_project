@@ -1,0 +1,2 @@
+/usr/bin/ar cr libcma.a  CMakeFiles/cma.dir/cma.c.o
+/usr/bin/ranlib libcma.a

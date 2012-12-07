@@ -1,0 +1,2 @@
+/home/lansdon/Dropbox/linux/wsu/project/build/CMakeFiles/cma.dir
+/home/lansdon/Dropbox/linux/wsu/project/build/CMakeFiles/ma.dir

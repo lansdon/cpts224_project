@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/lansdon/Dropbox/linux/wsu/project/cma.h
+stdio.h
+-
+
+/home/lansdon/Dropbox/linux/wsu/project/ma.c
+cma.h
+/home/lansdon/Dropbox/linux/wsu/project/cma.h
+project_config.h
+/home/lansdon/Dropbox/linux/wsu/project/project_config.h
+
+/home/lansdon/Dropbox/linux/wsu/project/project_config.h
+
