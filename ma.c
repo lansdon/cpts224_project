@@ -16,4 +16,6 @@ int main(int argc, char * argv[]) {
 	for (i = 9; i>=0; i--) 
 		class_free(strings[i]);
 	class_stats();
+
+	return 0;
 }

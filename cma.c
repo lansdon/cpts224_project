@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <pthread.h>
 
 #include "debug.h"
 #include "cma.h"
@@ -14,44 +15,88 @@ static void *class_limit=NULL;
 static MNode class_inuse=NULL;
 static MNode class_nouse=NULL;
 
+// Thread Safe Addition - LP
+static initialized = 0;
+static pthread_once_t once_block = PTHREAD_ONCE_INIT;
+pthread_mutex_t lock_membase;
+pthread_mutex_t lock_limit;
+pthread_mutex_t lock_inuse;
+pthread_mutex_t lock_nouse;
+
+static void init_func() {
+	// setup shared data mutexes
+	if(!initialized) {
+		printf("Mutex init function...\n");
+		pthread_mutex_init(&lock_membase, NULL);
+		pthread_mutex_init(&lock_limit, NULL);
+		pthread_mutex_init(&lock_inuse, NULL);
+		pthread_mutex_init(&lock_nouse, NULL);
+		initialized = 1;
+	}
+}
+
+
+
+
+
 static struct {
   unsigned long malloc,calloc,realloc,free,gc,nomem;
 } class_counters={0,0,0,0,0,0};
 
 static MNode class_AddToList(MNode list, MNode item) {
   ENTER;
+//  if(list == class_nouse) pthread_mutex_lock(&lock_nouse);
+//  else if(list == class_inuse) pthread_mutex_lock(&lock_inuse);
+
   item->next = list;
+
+//  if(list == class_nouse)  pthread_mutex_unlock(&lock_nouse);
+//  else if(list == class_inuse) pthread_mutex_unlock(&lock_inuse);
+
   RETURN(item);
 }
 
 static MNode class_RemoveFromList(MNode list,MNode item) {
   ENTER;
+//  if(list == class_nouse) pthread_mutex_lock(&lock_nouse);
+//  else if(list == class_inuse) pthread_mutex_lock(&lock_inuse);
 
   MNode p,prev;
+  MNode return_node = ITEMNOTFOUND;
 
   prev = NULL;
   for (p = list; p!=NULL; p = p->next) {
     if (p == item) {
       if (prev == NULL)
-list=p->next;
+	list=p->next;
       else
-prev->next = p->next;
-      RETURN(list);
+	prev->next = p->next;
+     return_node = list;
+     break;
     }
     prev=p;
   }
+
+//  if(list == class_nouse)  pthread_mutex_unlock(&lock_nouse);
+//  else if(list == class_inuse) pthread_mutex_unlock(&lock_inuse);
+
   //not in list..
-  RETURN(ITEMNOTFOUND);
+  RETURN(return_node);
 }
 
 
 static void class_printList(MNode list) {
   ENTER;
   if (!list) {
-EXIT;
+    EXIT;
     return;
   }
+//  if(list == class_nouse) pthread_mutex_lock(&lock_nouse);
+//  else if(list == class_inuse) pthread_mutex_lock(&lock_inuse);
   printf("Node %p, %ud\n",list,list->size);
+//  if(list == class_nouse)  pthread_mutex_unlock(&lock_nouse);
+//  else if(list == class_inuse) pthread_mutex_unlock(&lock_inuse);
+
   class_printList(list->next);
   EXIT;
 }
@@ -63,6 +108,15 @@ int class_memory(void *mem, size_t size) {
     RETURN(FALSE);
   }
 
+  // PTHREAD INIT
+  if(!initialized) {
+  	pthread_once(&once_block, init_func);
+  }
+  pthread_mutex_lock(&lock_nouse);
+  pthread_mutex_lock(&lock_inuse);
+  pthread_mutex_lock(&lock_membase);
+  pthread_mutex_lock(&lock_limit);  
+
   class_membase = mem;
   class_limit = mem+size;
   
@@ -70,6 +124,11 @@ int class_memory(void *mem, size_t size) {
   item = (MNode)mem;
   item->size=size-sizeof(struct MemNode);
   item->next = NULL;
+
+  pthread_mutex_unlock(&lock_nouse);
+  pthread_mutex_unlock(&lock_inuse);
+  pthread_mutex_unlock(&lock_membase);
+  pthread_mutex_unlock(&lock_limit);
   
   DEBUG("Creating Initial NoUseList with %x: %ud",item,size); 
   class_nouse = class_AddToList(class_nouse,item);
@@ -93,14 +152,16 @@ static MNode class_findNoUse(size_t target) {
   MNode best=NULL;
   MNode p=NULL;
   DEBUG("Searching for a block of size: %ud",target);
+//  pthread_mutex_lock(&lock_nouse);
   for (p=class_nouse;p!=NULL;p=p->next) {
     c = p->size - target;
     if (c >= 0 && c<closeness) {
       best = p;
       closeness=c;
       DEBUG("Best is now: %x size=%ud",best,p->size);
-	}
+    }
   }
+//  pthread_mutex_unlock(&lock_nouse);
   RETURN(best);
 }
 
@@ -126,6 +187,13 @@ MNode class_splitNode(MNode org,size_t size) {
 void *class_malloc(size_t size) {
   ENTER;
   MNode newnode,extra;
+  void *RETURN_PTR;
+
+  // Lock mutexes
+  pthread_mutex_lock(&lock_nouse);
+  pthread_mutex_lock(&lock_inuse);
+  pthread_mutex_lock(&lock_membase);
+  pthread_mutex_lock(&lock_limit);
 
   class_counters.malloc++;
   newnode = class_findNoUse(size);
@@ -140,12 +208,18 @@ void *class_malloc(size_t size) {
     
     newnode->next = NULL;
     class_inuse = class_AddToList(class_inuse,newnode);
-    RETURN((void *)newnode+sizeof(struct MemNode));
+    RETURN_PTR = ((void *)newnode+sizeof(struct MemNode));
   }
   else {
     class_counters.nomem++;
-    RETURN(NULL);
+    RETURN_PTR = NULL;
   }
+  pthread_mutex_unlock(&lock_nouse);
+  pthread_mutex_unlock(&lock_inuse);
+  pthread_mutex_unlock(&lock_membase);
+  pthread_mutex_unlock(&lock_limit);
+ 
+  RETURN(RETURN_PTR);
 }
 
 
@@ -164,19 +238,19 @@ end until
 */
 static void class_garbage() {
 	ENTER;
-    int count = 0;
+	int count = 0;
 	MNode here = class_nouse;
 	MNode there = here->next;		
 	MNode last = here;
 
+	pthread_mutex_lock(&lock_nouse);	
+	
 	while(TRUE) {
 		unsigned int startCount = count;
 		last = here;
-        there = here->next;
+        	there = here->next;
 
 		while(there) {
-//        for(MNode here=class_nouse; here; here = here->next ) {
-//		for(there=here->next; there; last = there, there = there->next) {
 			if(NXT(here) == there) {
 				last->next = there->next;
 				here->size += sizeof(struct MemNode) + there->size;
@@ -188,7 +262,6 @@ static void class_garbage() {
 			last = there;
 			there = there->next;
 		} 
-//        } 
 
 	// If inside loop did nothing stop searching. 
 		if(startCount == count) { 
@@ -196,7 +269,8 @@ static void class_garbage() {
 				printf("Garbage Final Count = %d\n", count);
 			break;
 		}
-    }
+	}
+	pthread_mutex_unlock(&lock_nouse);
 	EXIT;
 }
 
@@ -209,6 +283,9 @@ void class_free(void *ptr) {
     return;
   }
 
+  pthread_mutex_lock(&lock_nouse);
+  pthread_mutex_lock(&lock_inuse);
+
   class_counters.free++;
   cur=class_RemoveFromList(class_inuse,PTRTOMNODE(ptr));
   if (cur==ITEMNOTFOUND) {//not our pointer
@@ -217,6 +294,10 @@ void class_free(void *ptr) {
   }
   class_inuse = cur;
   class_nouse = class_AddToList(class_nouse,PTRTOMNODE(ptr));
+  
+  pthread_mutex_unlock(&lock_nouse);
+  pthread_mutex_unlock(&lock_inuse);
+
   class_garbage();
   EXIT;
 }

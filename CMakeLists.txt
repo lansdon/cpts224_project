@@ -15,16 +15,22 @@ configure_file (
 # so that we will find project_config.h
 include_directories("${PROJECT_BINARY_DIR}")
 
-#include_directories ("${PROJECT_SOURCE_DIR}/cma")
-#add_subdirectory (cma)
+# add Threads
+find_package(Threads)
 
 # add CMA Library
-add_library (cma cma.c)
+add_library (cma SHARED cma.c)
+#target_link_libraries(cma pthread)
 
 # add the executable
 add_executable(ma ma.c)
 target_link_libraries (ma cma)
+target_link_libraries (ma ${CMAKE_THREAD_LIBS_INIT})
 
+
+add_executable(thread_test thread_test.c)
+target_link_libraries (thread_test cma)
+target_link_libraries (thread_test ${CMAKE_THREAD_LIBS_INIT})
 
 # add the install targets
 #install (TARGETS cs224_project DESTINATION bin)
