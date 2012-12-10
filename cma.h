@@ -1,5 +1,10 @@
 #include <stdio.h>
 
+#ifdef __cplusplus
+	extern "C" {
+#endif
+
+
 typedef struct MemNode *MNode;
 
 struct MemNode {
@@ -18,6 +23,13 @@ int class_memory(void *mem, size_t size);
 static void class_garbage();
 
 void class_stats();
+
+
+#ifdef __cplusplus
+}
+#endif
+
+
 
 #define FALSE 0
 #define TRUE 1

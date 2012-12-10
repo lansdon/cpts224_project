@@ -1,8 +1,8 @@
 #include "cma.h"
 #include "project_config.h"
 #include <pthread.h>
-//#include <iostream>
-//#include <vector>
+#include <iostream>
+#include <vector>
 
 #define MSIZE 1024*16
 unsigned char mem[MSIZE];
@@ -31,6 +31,7 @@ int main() {
 
 	class_memory(mem,MSIZE); // give it memory allocator
 	struct thread_pair threads[10];
+	std::vector<thread_pair> vThreads(10);
 
         void *exit_status;
         printf( "Thread Test begin...\n");

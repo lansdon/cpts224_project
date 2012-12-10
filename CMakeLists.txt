@@ -28,7 +28,7 @@ target_link_libraries (ma cma)
 target_link_libraries (ma ${CMAKE_THREAD_LIBS_INIT})
 
 
-add_executable(thread_test thread_test.c)
+add_executable(thread_test thread_test.cpp)
 target_link_libraries (thread_test cma)
 target_link_libraries (thread_test ${CMAKE_THREAD_LIBS_INIT})
 
